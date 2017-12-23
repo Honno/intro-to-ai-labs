@@ -31,4 +31,11 @@
 	       (dolist (bedroom (second room) count)
 		 (incf count 1))
 	     (incf count 1))))) house-counts)))))
-	
+
+(defun sort-houses (houses min max)
+  (let ((query nil))
+    (dolist (house houses query)
+      (let ((cost (get-property-value `cost house)))
+	(unless (equal cost nil)
+	  (when (and (< min cost) (> max cost))
+	    (setf query (cons (list (get-property-value `name house) cost) query))))))))
