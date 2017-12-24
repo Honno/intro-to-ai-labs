@@ -46,3 +46,19 @@
 
 (defun condition-true (condition facts)
   (equal condition (condition-known condition facts)))
+
+(defun triggered-rule (rule facts)
+  (unless (conclusion-known rule facts)
+    (dolist (condition (get-conditions rule) rule)
+	(unless (condition-true condition facts)
+	  (setf rule nil)))))
+
+(defun get-triggered-rules (rules facts)
+  (let ((triggered-rules nil))
+    (dolist (rule rules triggered-rules)
+      (let ((nu-rule (triggered-rule rule facts)))
+	(when nu-rule
+	  (setf triggered-rules (cons rule triggered-rules)))))))
+
+(defun add-facts (fact facts)
+  (cons fact facts))
