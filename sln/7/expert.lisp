@@ -25,7 +25,7 @@
 ;; facts that are inferred kept on being added until either:
 ;; - a goal is found
 ;; - no untriggered rules exist
-(setf *facts ())
+(setf *facts `((black-stripes y) (hair y) (give-milk y) (hoofs y)))
 
 (defun get-conclusion (rule)
   (first rule))
@@ -54,9 +54,9 @@
 (defun condition-true (condition facts)
   (equal condition (condition-known condition facts)))
 
-(defun add-facts (fact facts)
-  (unless (assoc (first fact) facts)
-    (setf facts (cons fact facts))))
+(defun add-fact (fact)
+  (unless (assoc (first fact) *facts)
+      (setf *facts (cons fact *facts))))
 
 (defun get-rule (conclusion rules)
   (assoc conclusion rules))
@@ -109,19 +109,28 @@
 	(setf triggered-rules (cons rule triggered-rules))))))
 
 ;; add conclusions of triggered rules to working memory
-(defun fire-rules (triggered-rules goals facts)
+(defun fire-rules (triggered-rules goals)
   (goal-known
-   (dolist (rule triggered-rules facts)
-     (setf facts (add-facts (list (get-conclusion rule) `y) facts)))))
+   (dolist (rule triggered-rules *facts)
+     (setf *facts (add-fact (list (get-conclusion rule) `y))))))
 
-;; UNFINISHED
-(defun forward-chain (triggered-rules rules goals)
-  (let ((untriggered-rules triggered-rules)
-	(triggered-rules rules)
-	(goal nil))
-    (while (and (not untriggered-rules) (not goal))
-      (setf goal
-	    (fire-rules
-	     (get-triggered-rules rules *facts)
-	     goals
-	     *facts)))))
+(defun forward-chain (rules goals)
+  (let ((goal nil)
+	(prev-triggered-rules nil)
+	(triggered-rules rules) 
+	(untriggered nil))
+    (unless (loop while (and (not untriggered) (not goal))
+		  do
+		  (setf goal
+			(fire-rules
+		    (setf triggered-rules
+			  (get-triggered-rules rules *facts))
+		    goals))
+		  (setf untriggered (equal prev-triggered-rules triggered-rules))
+		  (setf prev-triggered-rules triggered-rules)
+		  (print triggered-rules)
+		  (print *facts)
+		  (print goal))
+      
+      goal)))
+  
