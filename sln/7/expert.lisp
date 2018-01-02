@@ -24,11 +24,8 @@
 
 ;; working memory
 ;; initially stores users known facts
-;; facts that are inferred kept on being added until either:
-;; - a goal is found
-;; - no untriggered rules exist
+; i.e. `((black-stripes y) (hair y) (give-milk y) (hoofs y))
 (setf *facts ())
-;i.e. (setf *facts `((black-stripes y) (hair y) (give-milk y) (hoofs y)))
 
 ;;; main mehods
 
@@ -36,36 +33,44 @@
   (forward-chain rules goals))
 
 ;; forward chaining reasoning
+;; inferred facts kept on being added to working memory until either:
+;; - a goal is found
+;; - no untriggered rules exist
 (defun forward-chain (rules goals)
-  (let ((goal nil)
-	(prev-triggered-rules nil)
-	(triggered-rules rules) 
-	(untriggered nil))
-    (unless (loop while (and (not untriggered) (not goal))
-		  do
-		  (setf goal
-			(fire-rules
-		    (setf triggered-rules
-			  (get-triggered-rules rules *facts))
-		    goals))
-		  (setf untriggered (equal prev-triggered-rules triggered-rules))
-		  (setf prev-triggered-rules triggered-rules))
-      goal)))
+  (let ((goal (goal-known *facts)))
+    (if goal
+	goal
+      (let ((triggered-rules (get-triggered-rules rules *facts)))
+	(when triggered-rules
+	  (progn
+	    (fire-rules triggered-rules *goals *facts)
+	    (forward-chain rules *goals)))))))
 
 ;;; main helper methods
 
 ;; add conclusions of triggered rules to working memory
-(defun fire-rules (triggered-rules goals)
+(defun fire-rules (triggered-rules goals facts)
   (goal-known
-   (dolist (rule triggered-rules *facts)
-     (setf *facts (add-fact (list (get-conclusion rule) `y))))))
+   (dolist (rule triggered-rules facts)
+     (setf facts (add-fact (list (get-conclusion rule) `y) facts)))))
 	      
 ;; returns all rules that are triggered
 (defun get-triggered-rules (rules facts)
   (let ((triggered-rules nil))
     (dolist (rule rules triggered-rules)
-      (when (triggered-rule rule facts)
-	(setf triggered-rules (cons rule triggered-rules))))))
+      (unless (assoc (get-conclusion rule) triggered-rules)
+	(when (triggered-rule rule facts)
+	  (setf triggered-rules (cons rule triggered-rules)))))))
+
+;; a triggered rule:
+;; - is not known by working memory
+;; - shares conditions with working memory
+;; i.e. given rule contains related information (found by inference)
+(defun triggered-rule (rule facts)
+  (unless (conclusion-known rule facts)
+    (dolist (condition (get-conditions rule) rule)
+      (unless (condition-true condition facts)
+	(setf rule nil)))))
 
 ;; check if goal is known in working memory
 (defun goal-known (facts)
@@ -75,7 +80,7 @@
       (when (assoc goal facts)
 	(setf found-goal goal)))))
 
-;;; main helper methods' helper methods
+;;; rule methods
 
 (defun get-conclusion (rule)
   (first rule))
@@ -104,19 +109,9 @@
 (defun condition-true (condition facts)
   (equal condition (condition-known condition facts)))
 
-(defun add-fact (fact)
-  (unless (assoc (first fact) *facts)
-      (setf *facts (cons fact *facts))))
+(defun add-fact (fact facts)
+  (unless (assoc (first fact) facts)
+      (setf *facts (cons fact facts))))
 
 (defun get-rule (conclusion rules)
   (assoc conclusion rules))
-
-;; a triggered rule:
-;; - is not known by working memory
-;; - shares conditions with working memory
-;; i.e. given rule contains related information (found by inference)
-(defun triggered-rule (rule facts)
-  (unless (conclusion-known rule facts)
-    (dolist (condition (get-conditions rule) rule)
-      (unless (condition-true condition facts)
-	(setf rule nil)))))
