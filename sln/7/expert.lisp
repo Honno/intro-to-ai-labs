@@ -1,5 +1,7 @@
 (defun tut () (load "expert.lisp"))
 
+;;; knowledge base
+
 ;; known rules
 (setf *rules `
       ((mammal ((hair y)(give-milk y)))
@@ -25,7 +27,55 @@
 ;; facts that are inferred kept on being added until either:
 ;; - a goal is found
 ;; - no untriggered rules exist
-(setf *facts `((black-stripes y) (hair y) (give-milk y) (hoofs y)))
+(setf *facts ())
+;i.e. (setf *facts `((black-stripes y) (hair y) (give-milk y) (hoofs y)))
+
+;;; main mehods
+
+(defun run (rules goals)
+  (forward-chain rules goals))
+
+;; forward chaining reasoning
+(defun forward-chain (rules goals)
+  (let ((goal nil)
+	(prev-triggered-rules nil)
+	(triggered-rules rules) 
+	(untriggered nil))
+    (unless (loop while (and (not untriggered) (not goal))
+		  do
+		  (setf goal
+			(fire-rules
+		    (setf triggered-rules
+			  (get-triggered-rules rules *facts))
+		    goals))
+		  (setf untriggered (equal prev-triggered-rules triggered-rules))
+		  (setf prev-triggered-rules triggered-rules))
+      goal)))
+
+;;; main helper methods
+
+;; add conclusions of triggered rules to working memory
+(defun fire-rules (triggered-rules goals)
+  (goal-known
+   (dolist (rule triggered-rules *facts)
+     (setf *facts (add-fact (list (get-conclusion rule) `y))))))
+	      
+;; returns all rules that are triggered
+(defun get-triggered-rules (rules facts)
+  (let ((triggered-rules nil))
+    (dolist (rule rules triggered-rules)
+      (when (triggered-rule rule facts)
+	(setf triggered-rules (cons rule triggered-rules))))))
+
+;; check if goal is known in working memory
+(defun goal-known (facts)
+  (let ((found-goal nil))
+    ;; check working memory with all known goals
+    (dolist (goal *goals found-goal)
+      (when (assoc goal facts)
+	(setf found-goal goal)))))
+
+;;; main helper methods' helper methods
 
 (defun get-conclusion (rule)
   (first rule))
@@ -61,36 +111,6 @@
 (defun get-rule (conclusion rules)
   (assoc conclusion rules))
 
-;; find goal of working memory
-(defun goal-known (facts)
-  (let ((found-goal nil))
-    ;; check working memory with all known goals
-    (dolist (goal *goals found-goal)
-      (unless found-goal
-	(let ((rule (get-rule goal *rules)))
-	  (let ((conditions (get-conditions rule))
-		(yes-conditions (get-yes-conditions rule))
-		(no-conditions (get-no-conditions rule)))
-	    ;; check if all the goal's conditions match with working memory
-	    (when
-		;; check if each condition of goal matches working memory
-		(let ((matched `T))
-		  (dolist (condition conditions matched)
-		    ;; when the condition matches working memory, add it to list of matches
-		    (unless
-			;; if condition is:
-			;; - is a no-condition
-			;; - is not matched in working memory
-			;; then accept match unless condition exists in working memory
-			;; otherwise accept match when condition is matched in working memory
-			(let ((if-true (condition-true condition facts)))
-			  (if (and (condition-known condition no-conditions) (not if-true))
-			      (not (condition-true (list (first condition) `y) facts))
-			    if-true))
-		      (setf matched nil))))
-	      (setf found-goal goal))))))))
-				       
-	    
 ;; a triggered rule:
 ;; - is not known by working memory
 ;; - shares conditions with working memory
@@ -100,37 +120,3 @@
     (dolist (condition (get-conditions rule) rule)
       (unless (condition-true condition facts)
 	(setf rule nil)))))
-	      
-;; returns all rules that are triggered
-(defun get-triggered-rules (rules facts)
-  (let ((triggered-rules nil))
-    (dolist (rule rules triggered-rules)
-      (when (triggered-rule rule facts)
-	(setf triggered-rules (cons rule triggered-rules))))))
-
-;; add conclusions of triggered rules to working memory
-(defun fire-rules (triggered-rules goals)
-  (goal-known
-   (dolist (rule triggered-rules *facts)
-     (setf *facts (add-fact (list (get-conclusion rule) `y))))))
-
-(defun forward-chain (rules goals)
-  (let ((goal nil)
-	(prev-triggered-rules nil)
-	(triggered-rules rules) 
-	(untriggered nil))
-    (unless (loop while (and (not untriggered) (not goal))
-		  do
-		  (setf goal
-			(fire-rules
-		    (setf triggered-rules
-			  (get-triggered-rules rules *facts))
-		    goals))
-		  (setf untriggered (equal prev-triggered-rules triggered-rules))
-		  (setf prev-triggered-rules triggered-rules)
-		  (print triggered-rules)
-		  (print *facts)
-		  (print goal))
-      
-      goal)))
-  
